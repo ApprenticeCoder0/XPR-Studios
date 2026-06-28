@@ -1,7 +1,115 @@
-import { AnimatePresence, motion, useInView } from 'motion/react';
+import { AnimatePresence, motion, useInView, useAnimation } from 'motion/react';
 import { Command, X } from 'lucide-react';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { CMS_DATA } from './data';
+
+function VortexText({ text }: { text: string }) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "0px" });
+
+  const letters = text.split("");
+
+  return (
+    <span ref={ref} className="inline-block relative">
+      {letters.map((char, index) => {
+        if (char === " ") return <span key={index} className="inline-block w-[0.3em]">&nbsp;</span>;
+        
+        // Random initial positions for the vortex effect
+        const randomX = (Math.random() - 0.5) * 800;
+        const randomY = (Math.random() - 0.5) * 800;
+        const randomRotate = (Math.random() - 0.5) * 720;
+        const randomScale = Math.random() * 3 + 0.5;
+
+        return (
+          <motion.span
+            key={index}
+            className="inline-block"
+            initial={{ 
+              opacity: 0, 
+              x: randomX, 
+              y: randomY, 
+              rotateZ: randomRotate,
+              scale: randomScale,
+              filter: 'blur(10px)'
+            }}
+            animate={isInView ? { 
+              opacity: 1, 
+              x: 0, 
+              y: 0, 
+              rotateZ: 0, 
+              scale: 1,
+              filter: 'blur(0px)'
+            } : {}}
+            transition={{ 
+              duration: 2.5, 
+              ease: [0.16, 1, 0.3, 1], 
+              delay: index * 0.05 + Math.random() * 0.5 
+            }}
+          >
+            {char}
+          </motion.span>
+        );
+      })}
+    </span>
+  );
+}
+
+function ExponentialCounter({ target, suffix }: { target: number, suffix: string }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true });
+
+  useEffect(() => {
+    if (!isInView) return;
+    
+    let startTimestamp: number | null = null;
+    const duration = 2500; // 2.5 seconds
+
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      
+      // easeOutExpo
+      const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      
+      const currentCount = Math.floor(easeProgress * target);
+      setCount(currentCount);
+      
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      } else {
+        setCount(target);
+      }
+    };
+    
+    window.requestAnimationFrame(step);
+  }, [isInView, target]);
+
+  if (count === target) {
+    return <span ref={ref}>{target >= 1000 ? `${Math.floor(target/1000)}K` : target}{suffix}</span>;
+  }
+
+  return <span ref={ref} className="tabular-nums font-mono">{count.toLocaleString()}</span>;
+}
+
+function AnimatedStat({ text }: { text: string }) {
+  // Check if it's "50K+"
+  if (text === "50K+") return <ExponentialCounter target={50000} suffix="+" />;
+  // Check if it's "3"
+  if (text === "3") return <ExponentialCounter target={3} suffix="" />;
+  
+  // For normal text like "<2h" or "N:H"
+  return (
+    <motion.span 
+      initial={{ opacity: 0, filter: 'blur(5px)' }}
+      whileInView={{ opacity: 1, filter: 'blur(0px)' }}
+      viewport={{ once: true }}
+      transition={{ duration: 1 }}
+    >
+      {text}
+    </motion.span>
+  );
+}
 
 export default function App() {
   const [view, setView] = useState<'landing' | 'support'>('landing');
@@ -257,14 +365,11 @@ function LandingPage({ onGoToSupport }: { onGoToSupport: () => void; key?: React
           transition={{ duration: 1, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="text-6xl sm:text-7xl lg:text-8xl leading-[0.85] font-serif tracking-tighter italic max-w-4xl mb-12 relative z-10"
         >
-          Immersive <br/> 
+          <VortexText text="Immersive" /> <br/> 
           <motion.span 
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className="ml-12 sm:ml-24 inline-block"
           >
-            Roleplay
+            <VortexText text="Roleplay" />
           </motion.span>
         </motion.h1>
         
@@ -317,7 +422,7 @@ function LandingPage({ onGoToSupport }: { onGoToSupport: () => void; key?: React
             >
               <div className="absolute -inset-6 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.08)_0%,transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-md -z-10"></div>
               <span className="text-[9px] uppercase tracking-[0.2em] opacity-40 mb-3 group-hover:opacity-100 transition-opacity duration-500 group-hover:text-[#D4AF37]">{stat.label}</span>
-              <span className="text-2xl font-serif italic tracking-wide group-hover:text-white transition-colors duration-500"><ScrambleNumber text={stat.num} /></span>
+              <span className="text-2xl font-serif italic tracking-wide group-hover:text-white transition-colors duration-500"><AnimatedStat text={stat.num} /></span>
             </motion.div>
           ))}
         </motion.div>
