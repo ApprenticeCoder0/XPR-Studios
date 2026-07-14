@@ -1,7 +1,32 @@
-import { AnimatePresence, motion, useInView, useAnimation } from 'motion/react';
-import { Command, X } from 'lucide-react';
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { CMS_DATA } from './data';
+import { AnimatePresence, motion, useInView, useAnimation } from "motion/react";
+import { Command, X, Shield, Upload, FileText, ArrowRight } from "lucide-react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
+import { CMS_DATA } from "./data";
+import { InteractiveBackground } from "./components/InteractiveBackground";
+import { Navigation } from "./components/Navigation";
+import { StaffPanel } from "./components/StaffPanel";
+import { AdminPanel } from "./components/AdminPanel";
+import { BansPage } from "./components/BansPage";
+import { ProjectsPage } from "./components/ProjectsPage";
+import { AboutPage } from "./components/AboutPage";
+import { ServerStatus } from "./components/ServerStatus";
+import { UserDashboard } from "./components/UserDashboard";
+import { CommunityPage } from "./components/CommunityPage";
+import { BlogPage } from "./components/BlogPage";
+import { WikiPage } from "./components/WikiPage";
+import { useAuth } from "./contexts/AuthContext";
+import { useAchievements } from "./contexts/AchievementContext";
+import { useToast } from "./contexts/ToastContext";
+import { useServer } from "./contexts/ServerContext";
+import { LiveMap } from "./components/LiveMap";
+import {
+  UserRole,
+  Ticket,
+  TicketSituation,
+  TicketGrade,
+  TicketTime,
+} from "./types";
+
 
 function VortexText({ text }: { text: string }) {
   const ref = useRef(null);
@@ -12,8 +37,13 @@ function VortexText({ text }: { text: string }) {
   return (
     <span ref={ref} className="inline-block relative">
       {letters.map((char, index) => {
-        if (char === " ") return <span key={index} className="inline-block w-[0.3em]">&nbsp;</span>;
-        
+        if (char === " ")
+          return (
+            <span key={index} className="inline-block w-[0.3em]">
+              &nbsp;
+            </span>
+          );
+
         // Random initial positions for the vortex effect
         const randomX = (Math.random() - 0.5) * 800;
         const randomY = (Math.random() - 0.5) * 800;
@@ -24,26 +54,30 @@ function VortexText({ text }: { text: string }) {
           <motion.span
             key={index}
             className="inline-block"
-            initial={{ 
-              opacity: 0, 
-              x: randomX, 
-              y: randomY, 
+            initial={{
+              opacity: 0,
+              x: randomX,
+              y: randomY,
               rotateZ: randomRotate,
               scale: randomScale,
-              filter: 'blur(10px)'
+              filter: "blur(10px)",
             }}
-            animate={isInView ? { 
-              opacity: 1, 
-              x: 0, 
-              y: 0, 
-              rotateZ: 0, 
-              scale: 1,
-              filter: 'blur(0px)'
-            } : {}}
-            transition={{ 
-              duration: 2.5, 
-              ease: [0.16, 1, 0.3, 1], 
-              delay: index * 0.05 + Math.random() * 0.5 
+            animate={
+              isInView
+                ? {
+                    opacity: 1,
+                    x: 0,
+                    y: 0,
+                    rotateZ: 0,
+                    scale: 1,
+                    filter: "blur(0px)",
+                  }
+                : {}
+            }
+            transition={{
+              duration: 2.5,
+              ease: [0.16, 1, 0.3, 1],
+              delay: index * 0.05 + Math.random() * 0.5,
             }}
           >
             {char}
@@ -54,42 +88,57 @@ function VortexText({ text }: { text: string }) {
   );
 }
 
-function ExponentialCounter({ target, suffix }: { target: number, suffix: string }) {
+function ExponentialCounter({
+  target,
+  suffix,
+}: {
+  target: number;
+  suffix: string;
+}) {
   const [count, setCount] = useState(0);
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
 
   useEffect(() => {
     if (!isInView) return;
-    
+
     let startTimestamp: number | null = null;
     const duration = 2500; // 2.5 seconds
 
     const step = (timestamp: number) => {
       if (!startTimestamp) startTimestamp = timestamp;
       const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      
+
       // easeOutExpo
       const easeProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      
+
       const currentCount = Math.floor(easeProgress * target);
       setCount(currentCount);
-      
+
       if (progress < 1) {
         window.requestAnimationFrame(step);
       } else {
         setCount(target);
       }
     };
-    
+
     window.requestAnimationFrame(step);
   }, [isInView, target]);
 
   if (count === target) {
-    return <span ref={ref}>{target >= 1000 ? `${Math.floor(target/1000)}K` : target}{suffix}</span>;
+    return (
+      <span ref={ref}>
+        {target >= 1000 ? `${Math.floor(target / 1000)}K` : target}
+        {suffix}
+      </span>
+    );
   }
 
-  return <span ref={ref} className="tabular-nums font-mono">{count.toLocaleString()}</span>;
+  return (
+    <span ref={ref} className="tabular-nums font-mono">
+      {count.toLocaleString()}
+    </span>
+  );
 }
 
 function AnimatedStat({ text }: { text: string }) {
@@ -97,12 +146,12 @@ function AnimatedStat({ text }: { text: string }) {
   if (text === "50K+") return <ExponentialCounter target={50000} suffix="+" />;
   // Check if it's "3"
   if (text === "3") return <ExponentialCounter target={3} suffix="" />;
-  
+
   // For normal text like "<2h" or "N:H"
   return (
-    <motion.span 
-      initial={{ opacity: 0, filter: 'blur(5px)' }}
-      whileInView={{ opacity: 1, filter: 'blur(0px)' }}
+    <motion.span
+      initial={{ opacity: 0, filter: "blur(5px)" }}
+      whileInView={{ opacity: 1, filter: "blur(0px)" }}
       viewport={{ once: true }}
       transition={{ duration: 1 }}
     >
@@ -111,68 +160,164 @@ function AnimatedStat({ text }: { text: string }) {
   );
 }
 
+
 export default function App() {
-  const [view, setView] = useState<'landing' | 'support'>('landing');
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [view, setView] = useState("home");
+  const { trackNavigation } = useAchievements();
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    trackNavigation(view);
+  }, [view, trackNavigation]);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const { user, logout, updateProfilePicture } = useAuth();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [view]);
 
   return (
     <div className="min-h-screen bg-[#0C0C0C] text-[#E5E5E5] font-sans flex flex-col">
-      {/* Topbar */}
-      <motion.header 
+      {/* Unified Header */}
+      <motion.header
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="h-20 px-6 sm:px-12 flex items-center justify-between border-b border-[#1A1A1A] bg-[#0C0C0C]/80 backdrop-blur-md sticky top-0 z-50"
+        className="h-20 px-6 sm:px-12 flex items-center justify-between border-b border-[#1A1A1A] bg-[#0C0C0C]/80 backdrop-blur-xl sticky top-0 z-50"
       >
-        <motion.div 
+        <motion.div
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="flex items-center gap-3 cursor-pointer group" 
-          onClick={() => setView('landing')}
+          className="flex items-center gap-3 cursor-pointer group"
+          onClick={() => setView("home")}
         >
           <div className="w-3 h-3 bg-[#D4AF37] rounded-full shadow-[0_0_10px_#D4AF37] group-hover:shadow-[0_0_15px_#D4AF37] transition-shadow duration-500"></div>
           <h1 className="text-xs font-bold tracking-[0.4em] uppercase text-[#D4AF37] group-hover:text-white transition-colors duration-500">
             XPR Studio
           </h1>
         </motion.div>
-        
+
+        <Navigation currentView={view} onNavigate={setView} />
+
         <div className="flex items-center gap-4">
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setIsLoginOpen(true)}
-            className="text-[10px] uppercase tracking-[0.2em] px-5 py-2.5 border border-[#333] rounded-full hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] transition-all duration-500 flex items-center gap-2"
-          >
-            Sign In
-          </motion.button>
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setView(view === 'landing' ? 'support' : 'landing')}
-            className="text-[10px] uppercase tracking-[0.2em] px-5 py-2.5 border border-[#333] rounded-full hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] transition-all duration-500 flex items-center gap-2 bg-[#111]"
-          >
-            {view === 'landing' ? 'Portal' : 'Back to Studio'}
-          </motion.button>
+          {user ? (
+            <div className="flex items-center gap-4">
+              {user.profilePicture && (
+                <img
+                  onClick={() => {
+                    const url = window.prompt("Enter new profile picture URL:");
+                    if (url) updateProfilePicture(url);
+                  }}
+                  style={{ cursor: "pointer" }}
+                  title="Change Profile Picture"
+                  src={user.profilePicture}
+                  alt="Profile"
+                  className="w-8 h-8 rounded-full border border-[#333]"
+                />
+              )}
+              <span className="text-[10px] uppercase tracking-[0.1em] text-white/70 hidden sm:inline-block">
+                {user.name} ({UserRole[user.role]})
+              </span>
+              {user.role >= UserRole.STAFF_INITIATE && user.role < UserRole.ADMIN && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setView("staff")}
+                  className="text-[10px] uppercase tracking-[0.2em] px-4 py-2 border border-[#D4AF37] text-[#D4AF37] rounded-full hover:bg-[#D4AF37]/10 transition-all duration-500"
+                >
+                  Staff Panel
+                </motion.button>
+              )}
+              {user.role >= UserRole.ADMIN && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setView("admin")}
+                  className="text-[10px] uppercase tracking-[0.2em] px-4 py-2 border border-red-500 text-red-500 rounded-full hover:bg-red-500/10 transition-all duration-500"
+                >
+                  Admin Panel
+                </motion.button>
+              )}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={logout}
+                className="text-[10px] uppercase tracking-[0.2em] px-4 py-2 border border-[#333] rounded-full hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-500 transition-all duration-500"
+              >
+                Logout
+              </motion.button>
+            </div>
+          ) : (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setIsLoginOpen(true)}
+              className="text-[10px] uppercase tracking-[0.2em] px-5 py-2.5 border border-[#333] rounded-full hover:border-[#D4AF37]/50 hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] transition-all duration-500 flex items-center gap-2"
+            >
+              Sign In
+            </motion.button>
+          )}
         </div>
       </motion.header>
 
       {/* Main Content */}
       <main className="flex-1 w-full relative">
         <AnimatePresence mode="wait">
-          {view === 'landing' ? (
-            <LandingPage key="landing" onGoToSupport={() => setView('support')} />
-          ) : (
-            <SupportPortal key="support" onOpenLogin={() => setIsLoginOpen(true)} />
-          )}
+          {(() => {
+            switch (view) {
+              case "dashboard":
+                return <UserDashboard key="dashboard" onNavigate={setView} />;
+              case "home":
+                return <LandingPage key="landing" onNavigate={setView} />;
+              case "support":
+                return (
+                  <SupportPortal
+                    key="support"
+                    onOpenLogin={() => setIsLoginOpen(true)}
+                  />
+                );
+              case "bans":
+                return <BansPage key="bans" />;
+              case "staff":
+                return <StaffPanel key="staff" />;
+              case "admin":
+                return <AdminPanel key="admin" />;
+              case "projects":
+                return <ProjectsPage key="projects" />;
+              case "about":
+                return <AboutPage key="about" />;
+              case "community":
+                return <CommunityPage key="community" />;
+              case "blog":
+                return <BlogPage key="blog" />;
+              case "wiki":
+                return <WikiPage key="wiki" />;
+              default:
+                return (
+                  <motion.div
+                    key="placeholder"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex-1 flex items-center justify-center min-h-[60vh]"
+                  >
+                    <div className="text-center">
+                      <h2 className="text-3xl font-serif italic text-white/50 mb-4">
+                        Module Offline
+                      </h2>
+                      <p className="text-white/30 text-sm max-w-md mx-auto">
+                        This section is currently undergoing maintenance or has
+                        not been deployed to this environment.
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+            }
+          })()}
         </AnimatePresence>
       </main>
 
       {/* Footer */}
-      <motion.footer 
+      <motion.footer
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
@@ -183,7 +328,9 @@ export default function App() {
           <div className="w-2 h-2 bg-[#D4AF37] rounded-full shadow-[0_0_5px_#D4AF37]"></div>
           <span>XPR Studio</span>
         </div>
-        <div className="hover:text-white transition-colors duration-300">© 2025 XPR Studio. All rights reserved.</div>
+        <div className="hover:text-white transition-colors duration-300">
+          © 2025 XPR Studio. All rights reserved.
+        </div>
       </motion.footer>
 
       {/* Login Modal */}
@@ -194,8 +341,36 @@ export default function App() {
   );
 }
 
+
 function AuthModal({ onClose }: { onClose: () => void }) {
-  const [view, setView] = useState<'login' | 'register' | 'forgot_password'>('login');
+  const [view, setView] = useState<"login" | "register" | "forgot_password">("login");
+  const [email, setEmail] = useState("");
+  const { login } = useAuth();
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    let role = UserRole.USER;
+    if (email.includes("staff")) role = UserRole.STAFF_INITIATE;
+    if (email.includes("admin")) role = UserRole.ADMIN;
+    
+    login({
+      id: Math.random().toString(36).substring(7),
+      name: email.split("@")[0],
+      email,
+      role,
+    });
+    addToast("Logged in successfully", "success");
+    onClose();
+  };
 
   return (
     <motion.div
@@ -204,581 +379,507 @@ function AuthModal({ onClose }: { onClose: () => void }) {
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
     >
-      <motion.div 
+      <motion.div
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
         className="w-full max-w-md bg-[#0C0C0C] border border-[#222] p-8 sm:p-12 relative overflow-hidden"
       >
         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-50"></div>
-        
-        <button 
+        <button
           onClick={onClose}
           className="absolute top-6 right-6 text-white/40 hover:text-white transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
-
-        <div className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-8 text-center flex flex-col items-center gap-4">
-           <div className="w-8 h-8 rounded-full border border-[#D4AF37] flex items-center justify-center shadow-[0_0_15px_rgba(212,175,55,0.2)]">
-             <div className="w-2 h-2 bg-[#D4AF37] rounded-full shadow-[0_0_8px_#D4AF37]"></div>
-           </div>
-           {view === 'login' && 'Authentication'}
-           {view === 'register' && 'Registration'}
-           {view === 'forgot_password' && 'Password Reset'}
+        <div className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-8">
+          Authentication
         </div>
-
-        <form className="flex flex-col gap-6" onSubmit={(e) => { e.preventDefault(); onClose(); }}>
-          
-          <AnimatePresence mode="popLayout">
-            {view === 'register' && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="flex flex-col gap-2 overflow-hidden"
-              >
-                <label className="text-[9px] uppercase tracking-[0.2em] opacity-50 pt-2">Full Name</label>
-                <input type="text" required placeholder="Enter your name" className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white placeholder-white/20" />
-              </motion.div>
-            )}
-            {view === 'forgot_password' && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="text-xs opacity-70 text-center pb-2 leading-relaxed"
-              >
-                Enter your email address and we will send you a link to reset your password.
-              </motion.div>
-            )}
-          </AnimatePresence>
-
+        <form className="flex flex-col gap-6" onSubmit={handleLogin}>
           <div className="flex flex-col gap-2">
             <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">Email</label>
-            <input type="email" required placeholder="Enter your email" className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white placeholder-white/20" />
+            <input 
+              required
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="player@example.com"
+              className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white"
+            />
           </div>
-
-          <AnimatePresence mode="popLayout">
-            {view !== 'forgot_password' && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="flex flex-col gap-2 overflow-hidden"
-              >
-                <div className="flex justify-between items-center pt-2">
-                  <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">Password</label>
-                  {view === 'login' && (
-                    <button 
-                      type="button"
-                      onClick={() => setView('forgot_password')}
-                      className="text-[9px] uppercase tracking-[0.1em] text-[#D4AF37] opacity-70 hover:opacity-100 transition-opacity"
-                    >
-                      Forgot?
-                    </button>
-                  )}
-                </div>
-                <input type="password" required placeholder="Enter your password" className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white placeholder-white/20" />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <button type="submit" className="text-[10px] uppercase tracking-[0.2em] px-8 py-4 border border-[#D4AF37] text-black bg-[#D4AF37] hover:bg-[#c5a230] transition-colors mt-4 shadow-[0_0_20px_rgba(212,175,55,0.2)] hover:shadow-[0_0_30px_rgba(212,175,55,0.4)]">
-            {view === 'login' && 'Sign In'}
-            {view === 'register' && 'Create Account'}
-            {view === 'forgot_password' && 'Send Reset Link'}
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">Password</label>
+            <input 
+              required
+              type="password"
+              placeholder="••••••••"
+              className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white"
+            />
+          </div>
+          <button
+            type="submit"
+            className="text-[10px] uppercase tracking-[0.2em] px-8 py-4 bg-[#D4AF37] text-black font-bold hover:bg-white transition-colors mt-4"
+          >
+            Sign In
           </button>
-          
-          <div className="text-center mt-4 border-t border-[#1A1A1A] pt-6 flex flex-col gap-3">
-            <div>
-              <span className="text-[10px] uppercase tracking-[0.1em] opacity-50">
-                {view === 'login' ? 'New to XPR Studio? ' : (view === 'forgot_password' ? 'Remember your password? ' : 'Already have an account? ')}
-              </span>
-              <button 
-                type="button" 
-                onClick={() => setView(view === 'login' ? 'register' : 'login')}
-                className="text-[10px] uppercase tracking-[0.1em] text-[#D4AF37] hover:opacity-80 transition-colors"
-              >
-                {view === 'login' ? 'Create an account' : 'Sign in instead'}
-              </button>
-            </div>
-          </div>
         </form>
       </motion.div>
     </motion.div>
   );
 }
 
-function LandingPage({ onGoToSupport }: { onGoToSupport: () => void; key?: React.Key }) {
+function NewsletterForm() {
+  const [email, setEmail] = useState("");
+  const { addToast } = useToast();
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    addToast("Successfully subscribed to the newsletter!", "success");
+    setEmail("");
+  };
+
+  return (
+    <motion.form
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.8, delay: 0.3 }}
+      onSubmit={handleSubscribe}
+      className="flex w-full max-w-md gap-4"
+    >
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Enter your email address"
+        className="flex-1 bg-[#111] border border-[#222] text-sm px-4 py-3 outline-none focus:border-[#D4AF37] transition-colors text-white"
+        required
+      />
+      <button
+        type="submit"
+        className="text-[10px] uppercase tracking-[0.2em] px-8 py-3 bg-[#D4AF37] text-black font-bold hover:bg-white transition-colors"
+      >
+        Subscribe
+      </button>
+    </motion.form>
+  );
+}
+
+function LandingPage({ onNavigate }: { onNavigate: (view: string) => void; key?: React.Key; }) {
   const { hero, stats, about, experiences } = CMS_DATA;
-
-  // Stagger variants
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.15, delayChildren: 0.2 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 30 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } }
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
+      exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       className="w-full"
     >
       {/* Hero Section */}
       <section className="min-h-[80vh] flex flex-col justify-center px-12 sm:px-24 py-20 relative overflow-hidden">
-        {/* Background decorative text */}
-        <motion.div 
-          animate={{ y: [0, -15, 0], opacity: [0.03, 0.06, 0.03] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -top-10 -right-10 pointer-events-none"
-        >
-          <h1 className="text-[300px] leading-none font-serif italic select-none">X</h1>
-        </motion.div>
-
-        {/* Floating dust/particles effect (CSS radial gradient in background) */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.03)_0%,transparent_50%)] pointer-events-none"></div>
-
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           className="text-[10px] font-mono uppercase tracking-[0.4em] text-[#D4AF37] mb-8 flex items-center gap-4"
         >
           <span className="w-8 h-[1px] bg-[#D4AF37]/50"></span>
-          Roblox Game Studio
+          XPR Studio
         </motion.div>
-        
-        <motion.h1 
+        <motion.h1
           initial={{ y: 30, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 1, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="text-6xl sm:text-7xl lg:text-8xl leading-[0.85] font-serif tracking-tighter italic max-w-4xl mb-12 relative z-10"
+          className="text-6xl sm:text-7xl lg:text-8xl leading-[0.85] font-serif tracking-tighter italic max-w-4xl mb-6 relative z-10"
         >
-          <VortexText text="Immersive" /> <br/> 
-          <motion.span 
-            className="ml-12 sm:ml-24 inline-block"
-          >
-            <VortexText text="Roleplay" />
-          </motion.span>
+          <VortexText text={hero.title} />
         </motion.h1>
-        
-        <motion.p 
+        <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-md text-sm leading-relaxed opacity-50 font-light tracking-wide mb-12 relative z-10"
+          className="max-w-2xl text-base leading-relaxed opacity-70 font-light tracking-wide mb-12 relative z-10 space-y-4"
         >
-          {hero.subtitle}
-        </motion.p>
-        
-        <motion.div 
+          <p>{hero.subtitle}</p>
+          <p className="text-sm border-l-2 border-[#D4AF37]/50 pl-4 py-1">Join thousands of players in an ever-evolving, procedurally simulated universe. Real-time economies, territorial conquest, and unlimited progression.</p>
+        </motion.div>
+        <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex flex-wrap gap-8 relative z-10"
         >
-          <motion.button 
+          <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
+            onClick={() => onNavigate("support")}
             className="text-[10px] uppercase tracking-[0.2em] px-8 py-3.5 border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black hover:shadow-[0_0_20px_rgba(212,175,55,0.3)] transition-all duration-500 rounded-full"
           >
-            Explore our games
+            Open a Ticket
           </motion.button>
-          <motion.button 
+          <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={onGoToSupport} 
+            onClick={() => onNavigate("projects")}
             className="text-[10px] uppercase tracking-[0.2em] px-8 py-3.5 border border-[#333] hover:border-[#D4AF37]/50 hover:bg-white/5 transition-all duration-500 rounded-full"
           >
-            Open a ticket
+            View Projects
           </motion.button>
-        </motion.div>
-
-        {/* Stats */}
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: "-100px" }}
-          className="mt-32 grid grid-cols-2 md:grid-cols-4 gap-12 max-w-5xl relative z-10"
-        >
-          {stats.map((stat, i) => (
-            <motion.div 
-              key={i} 
-              variants={itemVariants}
-              whileHover={{ y: -5 }}
-              className="flex flex-col relative group"
-            >
-              <div className="absolute -inset-6 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.08)_0%,transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-md -z-10"></div>
-              <span className="text-[9px] uppercase tracking-[0.2em] opacity-40 mb-3 group-hover:opacity-100 transition-opacity duration-500 group-hover:text-[#D4AF37]">{stat.label}</span>
-              <span className="text-2xl font-serif italic tracking-wide group-hover:text-white transition-colors duration-500"><AnimatedStat text={stat.num} /></span>
-            </motion.div>
-          ))}
+          
+          <motion.a
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            href={CMS_DATA.socials?.discord || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] uppercase tracking-[0.2em] px-8 py-3.5 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-500/60 transition-all duration-500 rounded-full flex items-center gap-2"
+          >
+            Join Discord
+          </motion.a>
         </motion.div>
       </section>
 
-      {/* About Section */}
-      <section className="py-32 px-12 sm:px-24 border-t border-[#1A1A1A] relative">
-        <motion.div 
-          initial={{ opacity: 0, width: 0 }}
-          whileInView={{ opacity: 1, width: "32px" }}
-          viewport={{ once: true }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="h-[1px] bg-[#D4AF37] absolute top-32 left-12 sm:left-24"
-        ></motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.2 }}
-          className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-16 ml-12"
-        >
-          About XPR Studio
-        </motion.div>
-        
-        <div className="grid lg:grid-cols-2 gap-24 items-start">
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
+      {/* Community Newsletter */}
+      <section className="border-t border-[#1A1A1A] py-20 px-12 sm:px-24">
+        <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-12"
-          >
-            <h2 className="text-5xl sm:text-6xl font-serif italic tracking-tighter leading-[0.9]">
-              {about.title}
-            </h2>
-            <p className="text-sm leading-relaxed opacity-50 font-light tracking-wide max-w-md">
-              {about.subtitle}
-            </p>
-            <div className="space-y-6 pt-4 text-[11px] leading-relaxed opacity-70 font-light max-w-md">
-              <p>{about.p1}</p>
-              <p>{about.p2}</p>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-100px" }}
-            className="flex flex-col space-y-12"
-          >
-            {about.pillars.map((pillar, i) => (
-              <motion.div 
-                key={i}
-                variants={itemVariants}
-                whileHover={{ x: 10 }}
-                className="flex items-start gap-8 border-b border-[#1A1A1A] pb-8 last:border-0 group cursor-default transition-transform duration-500"
-              >
-                <div className="text-[#D4AF37] text-xl font-serif italic opacity-60 shrink-0 group-hover:scale-110 group-hover:opacity-100 transition-all duration-500">
-                  <ScrambleNumber text={`0${i + 1}`} />
-                </div>
-                <div>
-                  <h3 className="text-xs uppercase tracking-widest font-bold mb-3 group-hover:text-[#D4AF37] transition-colors duration-500">{pillar.title}</h3>
-                  <p className="text-[10px] opacity-40 leading-relaxed max-w-xs group-hover:opacity-70 transition-opacity duration-500">{pillar.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Experiences Section */}
-      <section className="py-32 px-12 sm:px-24 border-t border-[#1A1A1A] bg-[#111] relative overflow-hidden">
-        <div className="max-w-7xl relative z-10">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-10 flex items-center gap-4"
+            className="text-[10px] font-mono uppercase tracking-[0.4em] text-[#D4AF37] mb-6 flex items-center gap-4"
           >
             <span className="w-8 h-[1px] bg-[#D4AF37]/50"></span>
-            Our Experiences
+            Stay Updated
+            <span className="w-8 h-[1px] bg-[#D4AF37]/50"></span>
           </motion.div>
           
-          <motion.h2 
+          <motion.h2
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="text-5xl sm:text-6xl font-serif italic tracking-tighter leading-[0.9] mb-8"
+            transition={{ duration: 0.8, delay: 0.1 }}
+            className="text-4xl sm:text-5xl font-serif italic tracking-tighter mb-6"
           >
-            Worlds worth playing
+            Community Newsletter
           </motion.h2>
           
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-sm leading-relaxed opacity-50 font-light tracking-wide max-w-md mb-20"
+            className="text-sm leading-relaxed opacity-50 font-light tracking-wide max-w-lg mb-10"
           >
-            Each game in our portfolio is built around a distinct theme and community ruleset.
+            Subscribe to receive the latest updates, patch notes, and exclusive events directly in your inbox.
           </motion.p>
 
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-100px" }}
-            className="grid md:grid-cols-2 lg:grid-cols-3 gap-16"
-          >
-            {experiences.map((exp, i) => (
-              <motion.div 
-                key={i}
-                variants={itemVariants}
-                whileHover={{ y: -8 }}
-                className="flex flex-col group cursor-pointer transition-transform duration-500"
-              >
-                <div className="h-56 border border-[#222] group-hover:border-[#D4AF37]/30 bg-[#0A0A0A] relative flex items-center justify-center mb-8 overflow-hidden transition-colors duration-700">
-                   <div className="absolute inset-0 bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] group-hover:opacity-30 transition-opacity duration-700"></div>
-                   
-                   {/* Interactive glow effect */}
-                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(212,175,55,0.1),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                   
-                   <motion.div 
-                     initial={{ rotate: -8, scale: 0.9 }}
-                     whileHover={{ rotate: 0, scale: 1 }}
-                     transition={{ duration: 0.6, ease: "easeOut" }}
-                     className="w-20 h-28 border border-white/5 bg-white/5 backdrop-blur-sm z-10 flex items-center justify-center text-4xl shadow-xl"
-                   >
-                     {exp.icon}
-                   </motion.div>
-                </div>
-                <div>
-                  <h3 className="text-xs uppercase tracking-widest font-bold mb-4 group-hover:text-[#D4AF37] transition-colors duration-500">{exp.title}</h3>
-                  <p className="text-[10px] opacity-40 leading-relaxed mb-6 group-hover:opacity-70 transition-opacity duration-500">{exp.desc}</p>
-                  <div className="flex flex-wrap gap-4">
-                    {exp.tags.map((tag, tIdx) => (
-                      <span key={tag} className="text-[9px] uppercase tracking-[0.2em] opacity-40 group-hover:opacity-80 transition-opacity duration-500" style={{ transitionDelay: `${tIdx * 100}ms` }}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
+          <NewsletterForm />
         </div>
       </section>
     </motion.div>
   );
 }
-
-function SupportPortal({ onOpenLogin }: { onOpenLogin?: () => void; key?: React.Key }) {
+function SupportPortal({
+  onOpenLogin,
+}: {
+  onOpenLogin?: () => void;
+  key?: React.Key;
+}) {
   const [isTicketOpen, setIsTicketOpen] = useState(false);
+  const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  const myTickets = [
+    { id: "1092", title: "Ban Appeal", status: "Communication Phase", category: "ban" },
+    { id: "1055", title: "RDM Report", status: "Resolved", category: "report" },
+    { id: "1032", title: "Permadeath Appeal", status: "Pending", category: "pd" },
+  ];
+
+  const filteredTickets = myTickets.filter(t => 
+    t.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
+    (statusFilter === "All" || t.status === statusFilter)
+  );
 
   return (
     <>
-    <motion.div
-      initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      exit={{ opacity: 0, scale: 0.98, filter: 'blur(10px)' }}
-      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-      className="p-12 sm:p-24 max-w-6xl mx-auto flex flex-col"
-    >
-      <div className="flex flex-col mb-24">
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.1 }}
-          className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-8 flex items-center gap-4"
-        >
-           <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span>
-           Support is Online
-        </motion.div>
-        <motion.h2 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="text-5xl sm:text-6xl lg:text-7xl font-serif italic tracking-tighter leading-[0.9] mb-10"
-        >
-          Welcome to <br/><span className="ml-12 sm:ml-24">Support</span>
-        </motion.h2>
-        <motion.p 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="text-sm leading-relaxed opacity-50 font-light tracking-wide max-w-md"
-        >
-          Open a ticket, report a rule-breaker, or appeal a ban — our team handles every request personally.
-        </motion.p>
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.4 }}
-          className="mt-12 flex flex-wrap gap-8"
-        >
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setIsTicketOpen(true)}
-            className="text-[10px] uppercase tracking-[0.2em] px-8 py-3.5 border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all duration-500 rounded-full hover:shadow-[0_0_20px_rgba(212,175,55,0.3)]"
+      <motion.div
+        initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
+        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        exit={{ opacity: 0, scale: 0.98, filter: "blur(10px)" }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="p-12 sm:p-24 max-w-6xl mx-auto flex flex-col"
+      >
+        <div className="flex flex-col mb-24">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.1 }}
+            className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-8 flex items-center gap-4"
           >
-            Open New Ticket
-          </motion.button>
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onOpenLogin}
-            className="text-[10px] uppercase tracking-[0.2em] px-8 py-3.5 border border-[#333] hover:border-[#D4AF37]/50 hover:bg-white/5 transition-all duration-500 rounded-full"
+            <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span>
+            Support is Online
+          </motion.div>
+          <motion.h2
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="text-5xl sm:text-6xl lg:text-7xl font-serif italic tracking-tighter leading-[0.9] mb-10"
           >
-            Sign In
-          </motion.button>
-        </motion.div>
-      </div>
-      
-      <div className="grid md:grid-cols-2 gap-20 border-t border-[#1A1A1A] pt-20">
-        <motion.div 
-          initial={{ opacity: 0, x: -30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="flex flex-col"
-        >
-          <h3 className="text-xs uppercase tracking-widest font-bold mb-10 opacity-70">Categories</h3>
-          <div className="grid grid-cols-2 gap-x-12 gap-y-8">
-            {[
-              { id: 'report', label: 'Report a user' },
-              { id: 'ban', label: 'Appeal your ban' },
-              { id: 'pd', label: 'Permadeath' },
-              { id: 'general', label: 'General' }
-            ].map((c, i) => (
-              <motion.button 
-                whileHover={{ x: 5 }}
-                key={c.id} 
+            Welcome to <br />
+            <span className="ml-12 sm:ml-24">Support</span>
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="text-sm leading-relaxed opacity-50 font-light tracking-wide max-w-md"
+          >
+            Open a ticket, report a rule-breaker, or appeal a ban — our team
+            handles every request personally.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="mt-12 flex flex-wrap gap-8"
+          >
+            {user ? (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setIsTicketOpen(true)}
-                className="text-left border-t border-[#222] pt-5 hover:border-[#D4AF37] transition-all duration-500 group flex flex-col relative"
+                className="text-[10px] uppercase tracking-[0.2em] px-8 py-3.5 border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all duration-500 rounded-full hover:shadow-[0_0_20px_rgba(212,175,55,0.3)]"
               >
-                <div className="absolute top-[-1px] left-0 w-0 h-[1px] bg-[#D4AF37] group-hover:w-full transition-all duration-700 ease-out"></div>
-                <span className="text-[#D4AF37] text-xl font-serif italic opacity-40 mb-5 group-hover:opacity-100 group-hover:scale-110 transform origin-left transition-all duration-500"><ScrambleNumber text={`0${i + 1}`} /></span>
-                <span className="text-xs font-medium tracking-wide mb-3 group-hover:text-white transition-colors duration-500">{c.label}</span>
-                <span className="text-[9px] uppercase tracking-[0.2em] opacity-30 group-hover:opacity-100 group-hover:text-[#D4AF37] transition-all duration-500">Open Ticket ↗</span>
+                Open New Ticket
               </motion.button>
-            ))}
-          </div>
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0, x: 30 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex flex-col border-l border-[#1A1A1A] md:pl-20"
-        >
-           <h3 className="text-xs uppercase tracking-widest font-bold mb-10 opacity-70">Recent Activity</h3>
-           <div 
-             onClick={onOpenLogin}
-             className="flex flex-col items-center justify-center h-48 text-center border border-[#222] bg-[#111] hover:bg-[#151515] hover:border-[#333] transition-colors duration-500 group cursor-pointer"
-           >
-             <span className="text-[10px] uppercase tracking-[0.2em] opacity-40 mb-3 group-hover:opacity-60 transition-opacity duration-500 group-hover:text-[#D4AF37]">Please sign in</span>
-             <span className="text-[10px] opacity-30 leading-relaxed group-hover:opacity-50 transition-opacity duration-500">Sign in to view your tickets</span>
-           </div>
-        </motion.div>
-      </div>
-    </motion.div>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={onOpenLogin}
+                className="text-[10px] uppercase tracking-[0.2em] px-8 py-3.5 border border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black transition-all duration-500 rounded-full hover:shadow-[0_0_20px_rgba(212,175,55,0.3)]"
+              >
+                Sign In to Open Ticket
+              </motion.button>
+            )}
+          </motion.div>
+        </div>
 
-    <AnimatePresence>
-      {isTicketOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-        >
-          <motion.div 
-            initial={{ scale: 0.95, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.95, y: 20 }}
-            className="w-full max-w-lg bg-[#0C0C0C] border border-[#222] p-8 sm:p-12 relative overflow-hidden"
+        <div className="grid md:grid-cols-2 gap-20 border-t border-[#1A1A1A] pt-20">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col"
           >
-            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-50"></div>
-            
-            <button 
-              onClick={() => setIsTicketOpen(false)}
-              className="absolute top-6 right-6 text-white/40 hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <h3 className="text-xs uppercase tracking-widest font-bold mb-10 opacity-70">
+              Categories
+            </h3>
+            <div className="grid grid-cols-2 gap-x-12 gap-y-8">
+              {[
+                { id: "report", label: "Report a user" },
+                { id: "ban", label: "Appeal your ban" },
+                { id: "pd", label: "Permadeath" },
+                { id: "general", label: "General" },
+              ].map((c, i) => (
+                <motion.button
+                  whileHover={{ x: 5 }}
+                  key={c.id}
+                  onClick={() =>
+                    user ? setIsTicketOpen(true) : onOpenLogin?.()
+                  }
+                  className="text-left border-t border-[#222] pt-5 hover:border-[#D4AF37] transition-all duration-500 group flex flex-col relative"
+                >
+                  <div className="absolute top-[-1px] left-0 w-0 h-[1px] bg-[#D4AF37] group-hover:w-full transition-all duration-700 ease-out"></div>
+                  <span className="text-[#D4AF37] text-xl font-serif italic opacity-40 mb-5 group-hover:opacity-100 group-hover:scale-110 transform origin-left transition-all duration-500">
+                    <ScrambleNumber text={`0${i + 1}`} />
+                  </span>
+                  <span className="text-xs font-medium tracking-wide mb-3 group-hover:text-white transition-colors duration-500">
+                    {c.label}
+                  </span>
+                  <span className="text-[9px] uppercase tracking-[0.2em] opacity-30 group-hover:opacity-100 group-hover:text-[#D4AF37] transition-all duration-500">
+                    Open Ticket ↗
+                  </span>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
 
-            <div className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-8">
-               New Ticket
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col border-l border-[#1A1A1A] md:pl-20"
+          >
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+              <h3 className="text-xs uppercase tracking-widest font-bold opacity-70">
+                My Tickets
+              </h3>
+              {user && (
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <input
+                    type="text"
+                    placeholder="Search tickets..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="bg-[#111] border border-[#222] px-3 py-1.5 text-xs text-white rounded outline-none focus:border-[#D4AF37] w-full sm:w-32"
+                  />
+                  <select 
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value)}
+                    className="bg-[#111] border border-[#222] px-2 py-1.5 text-xs text-white rounded outline-none focus:border-[#D4AF37]"
+                  >
+                    <option value="All">All</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Communication Phase">Communication</option>
+                    <option value="Resolved">Resolved</option>
+                  </select>
+                </div>
+              )}
             </div>
 
-            <form className="flex flex-col gap-6" onSubmit={(e) => { e.preventDefault(); setIsTicketOpen(false); }}>
-              <div className="flex flex-col gap-2">
-                <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">Category</label>
-                <select className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors appearance-none text-white/80">
-                  <option>Report a user</option>
-                  <option>Appeal your ban</option>
-                  <option>Permadeath</option>
-                  <option>General support</option>
-                </select>
+            {user ? (
+              <div className="flex flex-col gap-4 overflow-y-auto max-h-64 pr-2 custom-scrollbar">
+                {filteredTickets.length > 0 ? (
+                  filteredTickets.map(ticket => (
+                    <div key={ticket.id} className="border border-[#222] p-4 bg-[#111] hover:border-[#333] transition-colors cursor-pointer">
+                      <div className="flex justify-between items-start mb-2">
+                        <p className="text-sm font-medium">{ticket.title} #{ticket.id}</p>
+                      </div>
+                      <p className="text-[10px] text-white/50">
+                        Status:{" "}
+                        <span className={
+                          ticket.status === 'Resolved' ? 'text-green-400' :
+                          ticket.status === 'Pending' ? 'text-yellow-400' :
+                          'text-blue-400'
+                        }>
+                          {ticket.status}
+                        </span>
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-[10px] text-white/40 font-mono">No tickets found.</p>
+                )}
               </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">Subject</label>
-                <input type="text" required placeholder="Brief description of your issue" className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white placeholder-white/20" />
+            ) : (
+              <div
+                onClick={onOpenLogin}
+                className="flex flex-col items-center justify-center h-48 text-center border border-[#222] bg-[#111] hover:bg-[#151515] hover:border-[#333] transition-colors duration-500 group cursor-pointer"
+              >
+                <span className="text-[10px] uppercase tracking-[0.2em] opacity-40 mb-3 group-hover:opacity-60 transition-opacity duration-500 group-hover:text-[#D4AF37]">
+                  Please sign in
+                </span>
+                <span className="text-[10px] opacity-30 leading-relaxed group-hover:opacity-50 transition-opacity duration-500">
+                  Sign in to view your tickets
+                </span>
               </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">Details</label>
-                <textarea required rows={4} placeholder="Please provide as much detail as possible..." className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white placeholder-white/20 resize-none"></textarea>
-              </div>
-
-              <button type="submit" className="text-[10px] uppercase tracking-[0.2em] px-8 py-4 border border-[#D4AF37] text-black bg-[#D4AF37] hover:bg-[#c5a230] transition-colors mt-4">
-                Submit Ticket
-              </button>
-            </form>
+            )}
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {isTicketOpen && <TicketModal onClose={() => setIsTicketOpen(false)} />}
+      </AnimatePresence>
     </>
   );
 }
 
-function RouletteChar({ char, delay, isInView }: { char: string, delay: number, isInView: boolean; key?: React.Key }) {
-  const isAlphaNum = /[a-zA-Z0-9<>]/.test(char);
-  
-  const col = useMemo(() => {
-    if (!isAlphaNum) return [char];
-    const arr = [];
-    const possible = /[0-9]/.test(char) ? "0123456789" : "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    for(let i = 0; i < 24; i++) {
-       arr.push(possible[Math.floor(Math.random() * possible.length)]);
-    }
-    arr.push(char);
-    return arr;
-  }, [char, isAlphaNum]);
+function TicketModal({ onClose }: { onClose: () => void }) {
+  const { addToast } = useToast();
 
-  if (!isAlphaNum) {
-    return <span className="inline-block">{char}</span>;
-  }
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    addToast("Ticket submitted successfully. Staff will review it shortly.", "success");
+    onClose();
+  };
 
   return (
-    <span className="inline-block h-[1em] overflow-hidden leading-none align-bottom tabular-nums">
-       <motion.span
-         initial={{ y: "0%" }}
-         animate={isInView ? { y: `calc(-1em * ${col.length - 1})` } : { y: "0%" }}
-         transition={{ duration: 2.5 + delay, ease: [0.16, 1, 0.3, 1] }}
-         className="flex flex-col"
-       >
-         {col.map((c, i) => <span key={i} className="h-[1em] flex items-center justify-center">{c}</span>)}
-       </motion.span>
-    </span>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 20 }}
+        className="w-full max-w-lg bg-[#0C0C0C] border border-[#222] p-8 sm:p-12 relative overflow-hidden"
+      >
+        <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-50"></div>
+
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 text-white/40 hover:text-white transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-8">
+          New Ticket
+        </div>
+
+        <form
+          className="flex flex-col gap-6"
+          onSubmit={handleSubmit}
+        >
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">
+              Category
+            </label>
+            <select className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors appearance-none text-white/80">
+              <option>Report a user</option>
+              <option>Appeal your ban</option>
+              <option>Permadeath</option>
+              <option>General support</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">
+              Subject
+            </label>
+            <input 
+              required
+              type="text"
+              placeholder="Brief description of the issue"
+              className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">
+              Details
+            </label>
+            <textarea
+              required
+              rows={4}
+              placeholder="Provide as much context as possible..."
+              className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white resize-none"
+            />
+          </div>
+          <button
+            type="submit"
+            className="text-[10px] uppercase tracking-[0.2em] px-8 py-4 bg-[#D4AF37] text-black font-bold hover:bg-white transition-colors mt-4"
+          >
+            Submit Ticket
+          </button>
+        </form>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -789,8 +890,47 @@ function ScrambleNumber({ text }: { text: string }) {
   return (
     <span ref={ref} className="inline-flex tracking-tight overflow-hidden">
       {text.split("").map((char, i) => (
-        <RouletteChar key={i} char={char} delay={i * 0.15} isInView={isInView} />
+        <RouletteChar
+          key={i}
+          char={char}
+          delay={i * 0.15}
+          isInView={isInView}
+        />
       ))}
     </span>
   );
+}
+
+function RouletteChar({
+  char,
+  delay,
+  isInView,
+}: { char: string; delay: number; isInView: boolean; key?: React.Key; }) {
+  const [display, setDisplay] = useState(char);
+
+  useEffect(() => {
+    if (!isInView) return;
+    
+    let iterations = 0;
+    const maxIterations = 20;
+    let timeout: NodeJS.Timeout;
+
+    const tick = () => {
+      if (iterations >= maxIterations) {
+        setDisplay(char);
+        return;
+      }
+      setDisplay(Math.floor(Math.random() * 10).toString());
+      iterations++;
+      timeout = setTimeout(tick, 30);
+    };
+
+    const initialDelay = setTimeout(tick, delay * 1000);
+    return () => {
+      clearTimeout(timeout);
+      clearTimeout(initialDelay);
+    };
+  }, [char, delay, isInView]);
+
+  return <span className="inline-block w-[0.6em] text-center">{display}</span>;
 }
