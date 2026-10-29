@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "XPR Studio",
+  "description": "Attack on Titan roleplay community hub, server status, staff portal, and player dashboard for XPR Studio.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
