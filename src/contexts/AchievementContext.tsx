@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import { useToast } from "./ToastContext";
 
 export interface Achievement {
@@ -30,49 +30,55 @@ const AchievementContext = createContext<AchievementContextType | undefined>(und
 
 export const AchievementProvider = ({ children }: { children: ReactNode }) => {
   const [unlockedIds, setUnlockedIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem("studio_achievements");
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem("studio_achievements");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
-  
+
+  const unlockedRef = useRef<Set<string>>(new Set(unlockedIds));
   const [visitedViews, setVisitedViews] = useState<string[]>([]);
   const { addToast } = useToast();
 
   useEffect(() => {
-    localStorage.setItem("studio_achievements", JSON.stringify(unlockedIds));
+    try {
+      localStorage.setItem("studio_achievements", JSON.stringify(unlockedIds));
+    } catch {}
   }, [unlockedIds]);
 
-  const unlockAchievement = (id: string) => {
-    setUnlockedIds(prev => {
-      if (!prev.includes(id)) {
-        const achievement = ALL_ACHIEVEMENTS.find(a => a.id === id);
-        if (achievement) {
-          addToast(`Achievement Unlocked: ${achievement.name}!`, "success");
-        }
-        return [...prev, id];
-      }
-      return prev;
-    });
-  };
+  const unlockAchievement = useCallback((id: string) => {
+    if (unlockedRef.current.has(id)) return;
+    unlockedRef.current.add(id);
 
-  const trackNavigation = (view: string) => {
-    setVisitedViews(prev => {
-      const next = prev.includes(view) ? prev : [...prev, view];
-      
-      // Check for explorer
+    setUnlockedIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+
+    const achievement = ALL_ACHIEVEMENTS.find((a) => a.id === id);
+    if (achievement) {
+      // Schedule toast asynchronously outside of render phase
+      setTimeout(() => {
+        addToast(`Achievement Unlocked: ${achievement.name}!`, "success");
+      }, 50);
+    }
+  }, [addToast]);
+
+  const trackNavigation = useCallback((view: string) => {
+    setVisitedViews((prev) => {
+      if (prev.includes(view)) return prev;
+      const next = [...prev, view];
       if (next.length >= 5) {
-        // use a timeout to avoid setting state while rendering if called during render, though usually it's in a handler
-        setTimeout(() => unlockAchievement("explorer"), 0);
+        setTimeout(() => unlockAchievement("explorer"), 50);
       }
-      
       return next;
     });
 
-    if (view === "dashboard") setTimeout(() => unlockAchievement("first_login"), 0);
-    if (view === "community") setTimeout(() => unlockAchievement("social"), 0);
-    if (view === "wiki") setTimeout(() => unlockAchievement("lore"), 0);
-    if (view === "map") setTimeout(() => unlockAchievement("map"), 0);
-    if (view === "bans") setTimeout(() => unlockAchievement("rules"), 0);
-  };
+    if (view === "dashboard") setTimeout(() => unlockAchievement("first_login"), 50);
+    if (view === "community") setTimeout(() => unlockAchievement("social"), 50);
+    if (view === "wiki") setTimeout(() => unlockAchievement("lore"), 50);
+    if (view === "map") setTimeout(() => unlockAchievement("map"), 50);
+    if (view === "bans") setTimeout(() => unlockAchievement("rules"), 50);
+  }, [unlockAchievement]);
 
   return (
     <AchievementContext.Provider value={{ unlockedIds, unlockAchievement, trackNavigation }}>

@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   User, Settings, Award, Briefcase, Link as LinkIcon, Shield, 
-  Gamepad2, Code, Box, GitCommit, ExternalLink, Save, Edit3
+  Gamepad2, Code, Box, GitCommit, ExternalLink, Save, Edit3, X
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import { NetworkLatencyGauge } from "./NetworkLatencyGauge";
 import { useAchievements, ALL_ACHIEVEMENTS } from "../contexts/AchievementContext";
+import { AvatarModal } from "./AvatarModal";
 
 export function UserDashboard({
   onNavigate,
@@ -35,31 +36,61 @@ export function UserDashboard({
     { name: "Twitter / X", connected: false, value: "", color: "hover:text-blue-400" },
   ]);
 
-  const handleAddProject = () => {
-    const name = window.prompt("Enter Project Name:");
-    if (!name) return;
-    const role = window.prompt("Enter Your Role:") || "Contributor";
-    setProjects(prev => [{ name, role, views: "0" }, ...prev]);
+  // Modal states replacing window.prompt
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectRole, setNewProjectRole] = useState("Contributor");
+  const [socialModalIndex, setSocialModalIndex] = useState<number | null>(null);
+  const [socialInputValue, setSocialInputValue] = useState("");
+
+  const handleOpenAddProject = () => {
+    setNewProjectName("");
+    setNewProjectRole("Contributor");
+    setIsProjectModalOpen(true);
+  };
+
+  const handleSaveProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectName.trim()) return;
+    setProjects((prev) => [
+      { name: newProjectName.trim(), role: newProjectRole.trim() || "Contributor", views: "0" },
+      ...prev,
+    ]);
     addToast("Project added to portfolio.", "success");
+    setIsProjectModalOpen(false);
   };
 
   const toggleConnection = (index: number) => {
-    setSocials(prev => {
+    const target = socials[index];
+    if (!target) return;
+
+    if (target.connected) {
+      setSocials((prev) => {
+        const next = [...prev];
+        next[index] = { ...target, connected: false, value: "" };
+        return next;
+      });
+      addToast(target.name + " unlinked successfully.", "success");
+    } else {
+      setSocialModalIndex(index);
+      setSocialInputValue("");
+    }
+  };
+
+  const handleConfirmSocialLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (socialModalIndex === null || !socialInputValue.trim()) return;
+    const target = socials[socialModalIndex];
+    if (!target) return;
+
+    setSocials((prev) => {
       const next = [...prev];
-      if (next[index].connected) {
-        next[index].connected = false;
-        next[index].value = "";
-        addToast(next[index].name + " unlinked successfully.", "success");
-      } else {
-        const val = window.prompt("Enter your " + next[index].name + " username:");
-        if (val) {
-          next[index].connected = true;
-          next[index].value = val;
-          addToast(next[index].name + " linked successfully.", "success");
-        }
-      }
+      next[socialModalIndex] = { ...target, connected: true, value: socialInputValue.trim() };
       return next;
     });
+    addToast(target.name + " linked successfully.", "success");
+    setSocialModalIndex(null);
   };
 
 
@@ -161,10 +192,7 @@ export function UserDashboard({
               />
               <div 
                 className="absolute inset-0 bg-black/60 rounded-2xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                onClick={() => {
-                  const url = window.prompt("Enter new avatar URL (or leave blank to use Roblox API placeholder):");
-                  if (url) updateProfilePicture(url);
-                }}
+                onClick={() => setIsAvatarModalOpen(true)}
               >
                 <Edit3 size={20} className="text-white" />
               </div>
@@ -225,7 +253,7 @@ export function UserDashboard({
               <motion.div key="portfolio" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm uppercase tracking-widest text-white/70">My Creations</h3>
-                  <button onClick={handleAddProject} className="text-[10px] uppercase tracking-widest text-black px-4 py-2 rounded font-bold transition-colors hover:brightness-110" style={{ backgroundColor: themeColor }}>+ Add Project</button>
+                  <button onClick={handleOpenAddProject} className="text-[10px] uppercase tracking-widest text-black px-4 py-2 rounded font-bold transition-colors hover:brightness-110" style={{ backgroundColor: themeColor }}>+ Add Project</button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {projects.map((proj, i) => (
@@ -441,6 +469,150 @@ export function UserDashboard({
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Add Project Modal */}
+      <AnimatePresence>
+        {isProjectModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="w-full max-w-md bg-[#0C0C0C] border border-[#222] p-8 relative rounded-lg shadow-2xl"
+            >
+              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-60"></div>
+              <button
+                onClick={() => setIsProjectModalOpen(false)}
+                className="absolute top-5 right-5 text-white/40 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+              <h3 className="text-xl font-serif italic text-white/90 mb-1">Add Project</h3>
+              <p className="text-[10px] text-white/40 uppercase tracking-widest font-mono mb-6">
+                Portfolio Showcase
+              </p>
+
+              <form onSubmit={handleSaveProject} className="flex flex-col gap-4">
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-white/50 block mb-1.5 font-mono">
+                    Project Name
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    placeholder="e.g. Wall Maria Defenses"
+                    className="w-full bg-[#111] border border-[#333] text-sm p-3 rounded outline-none focus:border-[#D4AF37] text-white transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-white/50 block mb-1.5 font-mono">
+                    Your Role
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    value={newProjectRole}
+                    onChange={(e) => setNewProjectRole(e.target.value)}
+                    placeholder="e.g. Scripter / Modeller / Architect"
+                    className="w-full bg-[#111] border border-[#333] text-sm p-3 rounded outline-none focus:border-[#D4AF37] text-white transition-colors"
+                  />
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsProjectModalOpen(false)}
+                    className="flex-1 py-3 text-[10px] uppercase tracking-widest border border-[#333] hover:bg-white/5 rounded text-white/60 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 text-[10px] uppercase tracking-widest bg-[#D4AF37] text-black font-bold hover:bg-[#c5a230] rounded transition-colors"
+                  >
+                    Add Creation
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Social Connection Modal */}
+      <AnimatePresence>
+        {socialModalIndex !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="w-full max-w-md bg-[#0C0C0C] border border-[#222] p-8 relative rounded-lg shadow-2xl"
+            >
+              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-60"></div>
+              <button
+                onClick={() => setSocialModalIndex(null)}
+                className="absolute top-5 right-5 text-white/40 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+              <h3 className="text-xl font-serif italic text-white/90 mb-1">
+                Connect {socials[socialModalIndex]?.name}
+              </h3>
+              <p className="text-[10px] text-white/40 uppercase tracking-widest font-mono mb-6">
+                Display verified handle on your developer profile
+              </p>
+
+              <form onSubmit={handleConfirmSocialLink} className="flex flex-col gap-4">
+                <div>
+                  <label className="text-[9px] uppercase tracking-widest text-white/50 block mb-1.5 font-mono">
+                    {socials[socialModalIndex]?.name} Handle / Username
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    value={socialInputValue}
+                    onChange={(e) => setSocialInputValue(e.target.value)}
+                    placeholder={`Enter your ${socials[socialModalIndex]?.name} username`}
+                    className="w-full bg-[#111] border border-[#333] text-sm p-3 rounded outline-none focus:border-[#D4AF37] text-white transition-colors"
+                  />
+                </div>
+                <div className="flex gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setSocialModalIndex(null)}
+                    className="flex-1 py-3 text-[10px] uppercase tracking-widest border border-[#333] hover:bg-white/5 rounded text-white/60 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 py-3 text-[10px] uppercase tracking-widest bg-[#D4AF37] text-black font-bold hover:bg-[#c5a230] rounded transition-colors"
+                  >
+                    Link Account
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AvatarModal
+        isOpen={isAvatarModalOpen}
+        onClose={() => setIsAvatarModalOpen(false)}
+      />
     </motion.div>
   );
 }

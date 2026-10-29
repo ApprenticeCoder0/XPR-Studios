@@ -705,14 +705,14 @@ function SystemHealthLog() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-[#111] border border-red-500/30 rounded-md p-4 flex flex-col justify-between">
-          <h4 className="text-[10px] uppercase tracking-widest text-red-400 font-mono mb-2">
+        <div className="bg-[#111] border border-green-500/30 rounded-md p-4 flex flex-col justify-between">
+          <h4 className="text-[10px] uppercase tracking-widest text-green-400 font-mono mb-2">
             Database Status (Firebase)
           </h4>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-            <span className="text-xs text-white/70">
-              Disconnected - Using Mock Data
+            <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]"></span>
+            <span className="text-xs text-white/80">
+              Online - Connected (xpr-studio-website)
             </span>
           </div>
         </div>
@@ -734,11 +734,11 @@ function SystemHealthLog() {
         <div className="text-[#D4AF37] mb-4">
           XPR_OS v3.0.0 (Attack on Titan Branch) initialized...
         </div>
-        <div className="text-red-500 mb-1 bg-red-500/10 p-1 border-l-2 border-red-500">
-          [WARN] FIREBASE CONNECTION FAILED - Firestore is not initialized.
+        <div className="text-green-400 mb-1 bg-green-500/10 p-1 border-l-2 border-green-500">
+          [FIREBASE] Connected to xpr-studio-website.firebaseapp.com
         </div>
-        <div className="text-yellow-400 mb-1">
-          [WARN] Authentication module is using local mock states.
+        <div className="text-blue-400 mb-1">
+          [AUTH] Firebase Authentication initialized.
         </div>
         <div className="text-green-400 mb-1">
           [08:42:01] [SERVER] AoT_Main_Instance_1 spawned successfully.

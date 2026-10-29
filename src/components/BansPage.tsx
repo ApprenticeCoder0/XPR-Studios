@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Gavel, Search, ShieldAlert, ArrowRight, X } from "lucide-react";
 import { ConfirmModal } from "./ConfirmModal";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 
 const MOCK_BANS = [
   {
@@ -33,6 +34,7 @@ const MOCK_BANS = [
 
 export function BansPage() {
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [search, setSearch] = useState("");
   const [selectedBan, setSelectedBan] = useState<any>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -235,7 +237,7 @@ export function BansPage() {
                       isOpen={isConfirmOpen}
                       onClose={() => setIsConfirmOpen(false)}
                       onConfirm={() => {
-                         alert("Appeal Submitted");
+                         addToast("Appeal submitted successfully. Staff will review it shortly.", "success");
                          setSelectedBan(null);
                       }}
                       title="Submit Appeal?"

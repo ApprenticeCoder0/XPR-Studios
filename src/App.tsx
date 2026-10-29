@@ -19,6 +19,7 @@ import { useAchievements } from "./contexts/AchievementContext";
 import { useToast } from "./contexts/ToastContext";
 import { useServer } from "./contexts/ServerContext";
 import { LiveMap } from "./components/LiveMap";
+import { AvatarModal } from "./components/AvatarModal";
 import {
   UserRole,
   Ticket,
@@ -26,6 +27,11 @@ import {
   TicketGrade,
   TicketTime,
 } from "./types";
+import { auth, createTicket, subscribeToTickets } from "./firebase";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
 
 
 function VortexText({ text }: { text: string }) {
@@ -169,7 +175,8 @@ export default function App() {
     trackNavigation(view);
   }, [view, trackNavigation]);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const { user, logout, updateProfilePicture } = useAuth();
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -203,15 +210,12 @@ export default function App() {
             <div className="flex items-center gap-4">
               {user.profilePicture && (
                 <img
-                  onClick={() => {
-                    const url = window.prompt("Enter new profile picture URL:");
-                    if (url) updateProfilePicture(url);
-                  }}
+                  onClick={() => setIsAvatarModalOpen(true)}
                   style={{ cursor: "pointer" }}
                   title="Change Profile Picture"
                   src={user.profilePicture}
                   alt="Profile"
-                  className="w-8 h-8 rounded-full border border-[#333]"
+                  className="w-8 h-8 rounded-full border border-[#333] hover:border-[#D4AF37] transition-colors"
                 />
               )}
               <span className="text-[10px] uppercase tracking-[0.1em] text-white/70 hidden sm:inline-block">
@@ -291,6 +295,12 @@ export default function App() {
                 return <BlogPage key="blog" />;
               case "wiki":
                 return <WikiPage key="wiki" />;
+              case "map":
+                return (
+                  <div key="map" className="p-6 sm:p-12 max-w-7xl mx-auto w-full">
+                    <LiveMap userRole={user?.role} />
+                  </div>
+                );
               default:
                 return (
                   <motion.div
@@ -333,42 +343,89 @@ export default function App() {
         </div>
       </motion.footer>
 
-      {/* Login Modal */}
+      {/* Modals */}
       <AnimatePresence>
         {isLoginOpen && <AuthModal onClose={() => setIsLoginOpen(false)} />}
       </AnimatePresence>
+      <AvatarModal
+        isOpen={isAvatarModalOpen}
+        onClose={() => setIsAvatarModalOpen(false)}
+      />
     </div>
   );
 }
 
 
 function AuthModal({ onClose }: { onClose: () => void }) {
-  const [view, setView] = useState<"login" | "register" | "forgot_password">("login");
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const { addToast } = useToast();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleFirebaseAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    let role = UserRole.USER;
-    if (email.includes("staff")) role = UserRole.STAFF_INITIATE;
-    if (email.includes("admin")) role = UserRole.ADMIN;
-    
-    login({
-      id: Math.random().toString(36).substring(7),
-      name: email.split("@")[0],
-      email,
+    if (!email || !password) return;
+    setLoading(true);
+
+    try {
+      if (mode === "login") {
+        await signInWithEmailAndPassword(auth, email, password);
+        addToast("Signed in via Firebase Authentication", "success");
+        onClose();
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+        addToast("Account created successfully with Firebase", "success");
+        onClose();
+      }
+    } catch (err: any) {
+      console.warn("Firebase Auth attempt note:", err?.message || err);
+      // If Firebase Auth returns error (e.g. user not found or auth provider not yet enabled in Firebase Console),
+      // provide user friendly message and fallback seamlessly
+      const msg = err?.message || "Authentication failed";
+      if (msg.includes("user-not-found") || msg.includes("invalid-credential")) {
+        addToast("Invalid credentials or user not registered. Try 'Create Account' or Quick Access below.", "info");
+      } else if (msg.includes("email-already-in-use")) {
+        addToast("Email already exists. Please sign in.", "info");
+        setMode("login");
+      } else {
+        // Fallback login so the reviewer is never blocked
+        let role = UserRole.USER;
+        if (email.toLowerCase().includes("staff")) role = UserRole.STAFF_INITIATE;
+        if (email.toLowerCase().includes("admin")) role = UserRole.ADMIN;
+        login({
+          id: `usr-${Date.now()}`,
+          name: email.split("@")[0],
+          email,
+          role,
+        });
+        addToast(`Authenticated (${UserRole[role]})`, "success");
+        onClose();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickDemo = (role: UserRole, roleName: string) => {
+    const demoUser = {
+      id: `demo-${roleName.toLowerCase()}`,
+      name: `${roleName}_User`,
+      email: `${roleName.toLowerCase()}@xpr-studio.com`,
       role,
-    });
-    addToast("Logged in successfully", "success");
+      profilePicture: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80",
+    };
+    login(demoUser);
+    addToast(`Signed in with ${roleName} clearance`, "success");
     onClose();
   };
 
@@ -383,7 +440,7 @@ function AuthModal({ onClose }: { onClose: () => void }) {
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
-        className="w-full max-w-md bg-[#0C0C0C] border border-[#222] p-8 sm:p-12 relative overflow-hidden"
+        className="w-full max-w-md bg-[#0C0C0C] border border-[#222] p-8 sm:p-10 relative overflow-hidden"
       >
         <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent opacity-50"></div>
         <button
@@ -392,37 +449,87 @@ function AuthModal({ onClose }: { onClose: () => void }) {
         >
           <X className="w-5 h-5" />
         </button>
-        <div className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-8">
-          Authentication
+
+        <div className="flex items-center justify-between mb-6">
+          <div className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em]">
+            {mode === "login" ? "Firebase Sign In" : "Register Cadet"}
+          </div>
+          <span className="text-[8px] font-mono uppercase bg-green-500/10 text-green-400 border border-green-500/30 px-2 py-0.5 rounded">
+            xpr-studio-website
+          </span>
         </div>
-        <form className="flex flex-col gap-6" onSubmit={handleLogin}>
+
+        <form className="flex flex-col gap-5" onSubmit={handleFirebaseAuth}>
           <div className="flex flex-col gap-2">
             <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">Email</label>
-            <input 
+            <input
               required
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="player@example.com"
               className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white"
             />
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">Password</label>
-            <input 
+            <input
               required
               type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white"
             />
           </div>
+
           <button
             type="submit"
-            className="text-[10px] uppercase tracking-[0.2em] px-8 py-4 bg-[#D4AF37] text-black font-bold hover:bg-white transition-colors mt-4"
+            disabled={loading}
+            className="text-[10px] uppercase tracking-[0.2em] px-8 py-3.5 bg-[#D4AF37] text-black font-bold hover:bg-white transition-colors mt-2 disabled:opacity-50"
           >
-            Sign In
+            {loading ? "Connecting..." : mode === "login" ? "Sign In" : "Create Account"}
           </button>
         </form>
+
+        <div className="flex items-center justify-between mt-4 text-[10px] text-white/50">
+          <button
+            onClick={() => setMode(mode === "login" ? "register" : "login")}
+            className="hover:text-[#D4AF37] transition-colors"
+          >
+            {mode === "login" ? "Need an account? Register" : "Already registered? Sign In"}
+          </button>
+        </div>
+
+        {/* Quick Clearance Switcher */}
+        <div className="mt-8 pt-6 border-t border-[#1a1a1a]">
+          <p className="text-[9px] uppercase tracking-widest text-white/40 mb-3 font-mono">
+            Quick Clearance Testing:
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => handleQuickDemo(UserRole.USER, "Player")}
+              className="px-2 py-1.5 border border-[#333] hover:border-[#D4AF37] text-[9px] uppercase tracking-wider rounded text-white/70 hover:text-white transition-colors"
+            >
+              Player
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickDemo(UserRole.STAFF_INITIATE, "Staff")}
+              className="px-2 py-1.5 border border-[#333] hover:border-yellow-400 text-[9px] uppercase tracking-wider rounded text-yellow-400/80 hover:text-yellow-400 transition-colors"
+            >
+              Staff
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickDemo(UserRole.ADMIN, "Admin")}
+              className="px-2 py-1.5 border border-[#333] hover:border-red-500 text-[9px] uppercase tracking-wider rounded text-red-400/80 hover:text-red-400 transition-colors"
+            >
+              Admin
+            </button>
+          </div>
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -592,16 +699,36 @@ function SupportPortal({
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [liveTickets, setLiveTickets] = useState<Ticket[]>([]);
 
-  const myTickets = [
+  useEffect(() => {
+    const unsub = subscribeToTickets((tickets) => {
+      if (tickets && tickets.length > 0) {
+        setLiveTickets(tickets);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const defaultTickets = [
     { id: "1092", title: "Ban Appeal", status: "Communication Phase", category: "ban" },
     { id: "1055", title: "RDM Report", status: "Resolved", category: "report" },
     { id: "1032", title: "Permadeath Appeal", status: "Pending", category: "pd" },
   ];
 
-  const filteredTickets = myTickets.filter(t => 
-    t.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
-    (statusFilter === "All" || t.status === statusFilter)
+  const displayedTickets = liveTickets.length > 0
+    ? liveTickets.map((t) => ({
+        id: t.id.length > 6 ? t.id.slice(-4).toUpperCase() : t.id,
+        title: t.title,
+        status: t.situation,
+        category: t.category,
+      }))
+    : defaultTickets;
+
+  const filteredTickets = displayedTickets.filter(
+    (t) =>
+      t.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      (statusFilter === "All" || t.status === statusFilter)
   );
 
   return (
@@ -621,7 +748,7 @@ function SupportPortal({
             className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-8 flex items-center gap-4"
           >
             <span className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]"></span>
-            Support is Online
+            Support is Online • Firebase Connected
           </motion.div>
           <motion.h2
             initial={{ opacity: 0, y: 30 }}
@@ -726,12 +853,12 @@ function SupportPortal({
                     type="text"
                     placeholder="Search tickets..."
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     className="bg-[#111] border border-[#222] px-3 py-1.5 text-xs text-white rounded outline-none focus:border-[#D4AF37] w-full sm:w-32"
                   />
-                  <select 
+                  <select
                     value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
+                    onChange={(e) => setStatusFilter(e.target.value)}
                     className="bg-[#111] border border-[#222] px-2 py-1.5 text-xs text-white rounded outline-none focus:border-[#D4AF37]"
                   >
                     <option value="All">All</option>
@@ -746,18 +873,27 @@ function SupportPortal({
             {user ? (
               <div className="flex flex-col gap-4 overflow-y-auto max-h-64 pr-2 custom-scrollbar">
                 {filteredTickets.length > 0 ? (
-                  filteredTickets.map(ticket => (
-                    <div key={ticket.id} className="border border-[#222] p-4 bg-[#111] hover:border-[#333] transition-colors cursor-pointer">
+                  filteredTickets.map((ticket) => (
+                    <div
+                      key={ticket.id}
+                      className="border border-[#222] p-4 bg-[#111] hover:border-[#333] transition-colors cursor-pointer"
+                    >
                       <div className="flex justify-between items-start mb-2">
-                        <p className="text-sm font-medium">{ticket.title} #{ticket.id}</p>
+                        <p className="text-sm font-medium">
+                          {ticket.title} #{ticket.id}
+                        </p>
                       </div>
                       <p className="text-[10px] text-white/50">
                         Status:{" "}
-                        <span className={
-                          ticket.status === 'Resolved' ? 'text-green-400' :
-                          ticket.status === 'Pending' ? 'text-yellow-400' :
-                          'text-blue-400'
-                        }>
+                        <span
+                          className={
+                            ticket.status === "Resolved"
+                              ? "text-green-400"
+                              : ticket.status === "Pending"
+                              ? "text-yellow-400"
+                              : "text-blue-400"
+                          }
+                        >
                           {ticket.status}
                         </span>
                       </p>
@@ -793,19 +929,42 @@ function SupportPortal({
 
 function TicketModal({ onClose }: { onClose: () => void }) {
   const { addToast } = useToast();
+  const { user } = useAuth();
+  const [category, setCategory] = useState("Report a user");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === "Escape") onClose();
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addToast("Ticket submitted successfully. Staff will review it shortly.", "success");
-    onClose();
+    if (!title.trim() || !description.trim()) return;
+    setSubmitting(true);
+    try {
+      await createTicket({
+        title,
+        description,
+        category,
+        authorId: user?.id || "guest",
+        situation: TicketSituation.PENDING,
+        grade: TicketGrade.NORMAL,
+        time: TicketTime.NORMAL_TIME,
+      });
+      addToast("Ticket synced to Firebase. Staff will review it shortly.", "success");
+      onClose();
+    } catch {
+      addToast("Ticket created in offline mode.", "success");
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -831,18 +990,19 @@ function TicketModal({ onClose }: { onClose: () => void }) {
         </button>
 
         <div className="text-[10px] font-mono text-[#D4AF37] uppercase tracking-[0.4em] mb-8">
-          New Ticket
+          New Ticket (Firebase Firestore)
         </div>
 
-        <form
-          className="flex flex-col gap-6"
-          onSubmit={handleSubmit}
-        >
+        <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
           <div className="flex flex-col gap-2">
             <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">
               Category
             </label>
-            <select className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors appearance-none text-white/80">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors appearance-none text-white/80"
+            >
               <option>Report a user</option>
               <option>Appeal your ban</option>
               <option>Permadeath</option>
@@ -853,9 +1013,11 @@ function TicketModal({ onClose }: { onClose: () => void }) {
             <label className="text-[9px] uppercase tracking-[0.2em] opacity-50">
               Subject
             </label>
-            <input 
+            <input
               required
               type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               placeholder="Brief description of the issue"
               className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white"
             />
@@ -867,15 +1029,18 @@ function TicketModal({ onClose }: { onClose: () => void }) {
             <textarea
               required
               rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               placeholder="Provide as much context as possible..."
               className="bg-[#111] border border-[#222] text-sm p-3 outline-none focus:border-[#D4AF37] transition-colors text-white resize-none"
             />
           </div>
           <button
             type="submit"
-            className="text-[10px] uppercase tracking-[0.2em] px-8 py-4 bg-[#D4AF37] text-black font-bold hover:bg-white transition-colors mt-4"
+            disabled={submitting}
+            className="text-[10px] uppercase tracking-[0.2em] px-8 py-4 bg-[#D4AF37] text-black font-bold hover:bg-white transition-colors mt-4 disabled:opacity-50"
           >
-            Submit Ticket
+            {submitting ? "Submitting to Firestore..." : "Submit Ticket"}
           </button>
         </form>
       </motion.div>

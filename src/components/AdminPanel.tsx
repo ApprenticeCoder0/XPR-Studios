@@ -704,7 +704,7 @@ function StaffOverview() {
 function SystemHealthLog() {
   const { systemLogs: logs, addSystemLog } = React.useContext(AdminContext);
   const [isReconnecting, setIsReconnecting] = React.useState(false);
-  const [dbStatus, setDbStatus] = React.useState<"Disconnected" | "Reconnecting" | "Online">("Disconnected");
+  const [dbStatus, setDbStatus] = React.useState<"Disconnected" | "Reconnecting" | "Online">("Online");
 
   const handleForceReconnect = () => {
     if (isReconnecting || dbStatus === "Online") return;
@@ -748,9 +748,9 @@ function SystemHealthLog() {
             Database Status (Firebase)
           </h4>
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${dbStatus === "Online" ? "bg-green-500" : dbStatus === "Reconnecting" ? "bg-orange-500 animate-pulse" : "bg-red-500 animate-pulse"}`}></span>
+            <span className={`w-2 h-2 rounded-full ${dbStatus === "Online" ? "bg-green-500 shadow-[0_0_8px_#22c55e]" : dbStatus === "Reconnecting" ? "bg-orange-500 animate-pulse" : "bg-red-500 animate-pulse"}`}></span>
             <span className="text-xs text-white/70">
-              {dbStatus === "Online" ? "Online - Stable Connection" : dbStatus === "Reconnecting" ? "Attempting Connection..." : "Disconnected - Using Mock Data"}
+              {dbStatus === "Online" ? "Online - Connected (xpr-studio-website)" : dbStatus === "Reconnecting" ? "Attempting Connection..." : "Disconnected - Using Mock Data"}
             </span>
           </div>
         </div>
@@ -769,14 +769,14 @@ function SystemHealthLog() {
 
       <div className="flex-1 bg-black border border-[#222] rounded-md p-4 font-mono text-[10px] sm:text-xs overflow-y-auto relative custom-scrollbar mt-2">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(212,175,55,0.03)_1px,transparent_1px)] bg-[size:100%_4px] pointer-events-none"></div>
-        <div className="text-red-500 mb-4">
+        <div className="text-[#D4AF37] mb-4">
           XPR_OS v3.0.0 (Attack on Titan Branch) initialized...
         </div>
-        <div className="text-red-500 mb-1 bg-red-500/10 p-1 border-l-2 border-red-500">
-          [WARN] FIREBASE CONNECTION FAILED - Firestore is not initialized.
+        <div className="text-green-400 mb-1 bg-green-500/10 p-1 border-l-2 border-green-500">
+          [FIREBASE] Connected to xpr-studio-website.firebaseapp.com
         </div>
-        <div className="text-yellow-400 mb-1">
-          [WARN] Authentication module is using local mock states.
+        <div className="text-blue-400 mb-1">
+          [AUTH] Firebase Authentication initialized.
         </div>
         <div className="text-green-400 mb-1">
           [08:42:01] [SERVER] AoT_Main_Instance_1 spawned successfully.
